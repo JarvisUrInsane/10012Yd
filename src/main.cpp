@@ -48,12 +48,6 @@ std::shared_ptr<AsyncMotionProfileController> profileController =
  */
 void initialize() {
   drive->getModel()->setBrakeMode(AbstractMotor::brakeMode::brake);
-  profileController->generatePath(
-      {{0_ft, 0_ft,
-        0_deg}, // Profile starting position, this will normally be (0, 0, 0)
-       {3_ft, 0_ft, 0_deg}}, // The next point in the profile, 3 feet forward
-      "A"                    // Profile name
-  );
 }
 
 /**
@@ -86,11 +80,10 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
-
-  drive->moveDistance(61_cm);
-  drive->waitUntilSettled();
   imu.calibrate();
   imu.reset();
+  drive->moveDistance(61_cm);
+  drive->waitUntilSettled();
   drive->turnAngle(180_deg);
 }
 
