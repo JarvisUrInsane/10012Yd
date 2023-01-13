@@ -17,13 +17,12 @@ void on_center_button() {
 }
 Controller controller;
 Motor intake(14);
-Motor indexer(15);
+Motor flywheel(16);
 IMU imu(17);
 
 ControllerButton intakeIn(ControllerDigital::R2);
 ControllerButton intakeOut(ControllerDigital::R1);
-ControllerButton indexerBack(ControllerDigital::L1);
-ControllerButton indexerForward(ControllerDigital::L2);
+ControllerButton flywheelSpin(ControllerDigital::L1);
 
 auto drive = ChassisControllerBuilder()
                  .withMotors({-11, -12, -13}, {18, 19, 20})
@@ -48,6 +47,8 @@ std::shared_ptr<AsyncMotionProfileController> profileController =
  */
 void initialize() {
   drive->getModel()->setBrakeMode(AbstractMotor::brakeMode::brake);
+  intake.setBrakeMode(AbstractMotor::brakeMode::brake);
+  flywheel.setBrakeMode(AbstractMotor::brakeMode::coast);
 }
 
 /**
@@ -101,6 +102,7 @@ void autonomous() {
  * task, not resume it from where it left off.
  */
 void opcontrol() {
+  bool flywheelOn = false;
   while (true) {
     drive->getModel()->arcade(controller.getAnalog(ControllerAnalog::leftY),
                               controller.getAnalog(ControllerAnalog::rightX));
@@ -112,14 +114,10 @@ void opcontrol() {
       intake.moveVoltage(0);
     }
 
-    if (indexerBack.isPressed()) {
-      indexer.moveVoltage(12000);
-    } else if (indexerForward.isPressed()) {
-      indexer.moveVoltage(-12000);
-    } else {
-      indexer.moveVoltage(0);
+    if (flywheelSpin.changedToReleased()) {
+      flywheelOn = !flywheelOn;
     }
+    flywheel.moveVoltage(flywheelOn?12000:0);
 
     pros::delay(10);
   }
-}
