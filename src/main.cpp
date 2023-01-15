@@ -17,7 +17,7 @@ void on_center_button() {
 }
 Controller controller;
 Motor intake(14);
-Motor flywheel(16);
+Motor flywheel(-15);
 IMU imu(17);
 
 ControllerButton intakeIn(ControllerDigital::R2);
@@ -27,8 +27,11 @@ ControllerButton flywheelSpin(ControllerDigital::L1);
 auto drive = ChassisControllerBuilder()
                  .withMotors({-11, -12, -13}, {18, 19, 20})
                  // Green gearset, 4 in wheel diam, 11.5 in wheel track
-                 .withDimensions({AbstractMotor::gearset::blue, (36.0 / 60.0)},
+                 .withDimensions({AbstractMotor::gearset::blue, (60.0 / 36.0)},
                                  {{3.25_in, 12_in}, imev5BlueTPR})
+                 .withGains({0.0009, 0, 0.000001}, // Distance controller gains
+                            {0.001, 0, 0.0001}  // Turn controller gains
+                            )
                  .build();
 std::shared_ptr<AsyncMotionProfileController> profileController =
     AsyncMotionProfileControllerBuilder()
@@ -80,12 +83,47 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
+int intakeVoltage = 10000;
+
+void flywheelStart(){
+  flywheel.moveVoltage(12000);
+}
+void flywheelStop(){
+  flywheel.moveVoltage(0);
+}
+void intakeStart(){
+  intake.moveVoltage(intakeVoltage);
+}
+void intakeStop(){
+  intake.moveVoltage(0);
+}
+void indexerStart(){
+  intake.moveVoltage(-intakeVoltage/2);
+}
+void indexerStop(){
+  intake.moveVoltage(0);
+}
+void prepareToDriveOverDiscs(){
+  drive->getModel()->setMaxVelocity(200);
+}
+void normalDriving(){
+  drive->getModel()->setMaxVelocity(600);
+}
+
 void autonomous() {
-  imu.calibrate();
-  imu.reset();
-  drive->moveDistance(61_cm);
-  drive->waitUntilSettled();
-  drive->turnAngle(180_deg);
+  // imu.calibrate();
+  // imu.reset();
+  normalDriving();
+  flywheelStart();
+  intakeStart();
+  pros::delay(4000);
+  intakeStop();
+  indexerStart();
+  pros::delay(3000);
+  indexerStop();
+  flywheelStop();
+  //drive->moveDistanceAsync(20_in);
+  // intakeStop();
 }
 
 /**
@@ -107,9 +145,9 @@ void opcontrol() {
     drive->getModel()->arcade(controller.getAnalog(ControllerAnalog::leftY),
                               controller.getAnalog(ControllerAnalog::rightX));
     if (intakeIn.isPressed()) {
-      intake.moveVoltage(12000);
+      intake.moveVoltage(10000);
     } else if (intakeOut.isPressed()) {
-      intake.moveVoltage(-12000);
+      intake.moveVoltage(-10000);
     } else {
       intake.moveVoltage(0);
     }
@@ -117,7 +155,8 @@ void opcontrol() {
     if (flywheelSpin.changedToReleased()) {
       flywheelOn = !flywheelOn;
     }
-    flywheel.moveVoltage(flywheelOn?12000:0);
+    flywheel.moveVoltage(flywheelOn ? 12000 : 0);
 
     pros::delay(10);
   }
+}
