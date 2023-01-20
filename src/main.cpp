@@ -18,21 +18,26 @@ void on_center_button() {
 Controller controller;
 Motor intake(14);
 Motor flywheel(-15);
+pros::Motor p_flywheel(-15);
 IMU imu(17);
 
 ControllerButton intakeIn(ControllerDigital::R2);
 ControllerButton intakeOut(ControllerDigital::R1);
 ControllerButton flywheelSpin(ControllerDigital::L1);
+ControllerButton switchMode(ControllerDigital::X);
 
 auto drive = ChassisControllerBuilder()
                  .withMotors({-11, -12, -13}, {18, 19, 20})
                  // Green gearset, 4 in wheel diam, 11.5 in wheel track
                  .withDimensions({AbstractMotor::gearset::blue, (60.0 / 36.0)},
                                  {{3.25_in, 12_in}, imev5BlueTPR})
-                 .withGains({0.0009, 0, 0.000001}, // Distance controller gains
-                            {0.001, 0, 0.0001}  // Turn controller gains
+                 .withGains({0.0009, 0, 0.000001},  // Distance controller gains
+                            {0.0005, 0.002, 0.0001} // Turn controller gains
                             )
-                 .build();
+                //  .withSensors(12, 19, ADIEncoder{'A', 'B'})
+                //  .withOdometry({{2.75_in, 7_in}, quadEncoderTPR})
+                //  .buildOdometry();
+                .build();
 std::shared_ptr<AsyncMotionProfileController> profileController =
     AsyncMotionProfileControllerBuilder()
         .withLimits({
@@ -52,6 +57,9 @@ void initialize() {
   drive->getModel()->setBrakeMode(AbstractMotor::brakeMode::brake);
   intake.setBrakeMode(AbstractMotor::brakeMode::brake);
   flywheel.setBrakeMode(AbstractMotor::brakeMode::coast);
+  intake.moveVelocity(600);
+
+
 }
 
 /**
@@ -83,47 +91,54 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
-int intakeVoltage = 10000;
-
-void flywheelStart(){
-  flywheel.moveVoltage(12000);
-}
-void flywheelStop(){
-  flywheel.moveVoltage(0);
-}
-void intakeStart(){
-  intake.moveVoltage(intakeVoltage);
-}
-void intakeStop(){
-  intake.moveVoltage(0);
-}
-void indexerStart(){
-  intake.moveVoltage(-intakeVoltage/2);
-}
-void indexerStop(){
-  intake.moveVoltage(0);
-}
-void prepareToDriveOverDiscs(){
-  drive->getModel()->setMaxVelocity(200);
-}
-void normalDriving(){
-  drive->getModel()->setMaxVelocity(600);
-}
+const int intakeVoltage = 10000;
+struct RobotControls {
+private:
+  pros::Task robotControlsDaemon;
+public:
+  bool flywheelState, intakeState, indexerState, moveSlowState;
+  RobotControls()
+      : flywheelState(false), intakeState(false), indexerState(false), moveSlowState(false),
+        robotControlsDaemon([=] {
+          while (69) {
+            if (flywheelState) {
+              flywheel.moveVoltage(12000);
+            } else {
+              flywheel.moveVoltage(0);
+            }
+            if (intakeState) {
+              intake.moveVoltage(intakeVoltage);
+            } 
+            else if (indexerState) {
+              intake.moveVoltage(-intakeVoltage / 2);
+            } else {
+              intake.moveVoltage(0);
+            }
+            if (moveSlowState){
+              drive->setMaxVelocity(150);
+            } else{
+              drive->setMaxVelocity(600);
+            }
+            pros::delay(20);
+          }
+        }) {}
+  void resume() { robotControlsDaemon.resume(); }
+  void stop() { robotControlsDaemon.suspend(); }
+} robotControls;
 
 void autonomous() {
-  // imu.calibrate();
-  // imu.reset();
-  normalDriving();
-  flywheelStart();
-  intakeStart();
-  pros::delay(4000);
-  intakeStop();
-  indexerStart();
+  robotControls.intakeState = true;
+  robotControls.moveSlowState = true;
+  drive->moveDistanceAsync(60_in);
+  drive->waitUntilSettled();
+  pros::delay(1000);
+  robotControls.intakeState = false;
+  robotControls.flywheelState = true;
+  pros::delay(5000);
+  robotControls.indexerState = true;
   pros::delay(3000);
-  indexerStop();
-  flywheelStop();
-  //drive->moveDistanceAsync(20_in);
-  // intakeStop();
+  robotControls.moveSlowState = false;
+  drive->moveDistanceAsync(-40_in);
 }
 
 /**
@@ -141,21 +156,34 @@ void autonomous() {
  */
 void opcontrol() {
   bool flywheelOn = false;
+  bool arcadeDrive = true;
   while (true) {
-    drive->getModel()->arcade(controller.getAnalog(ControllerAnalog::leftY),
-                              controller.getAnalog(ControllerAnalog::rightX));
-    if (intakeIn.isPressed()) {
-      intake.moveVoltage(10000);
-    } else if (intakeOut.isPressed()) {
-      intake.moveVoltage(-10000);
-    } else {
-      intake.moveVoltage(0);
-    }
+    p_flywheel.move_voltage(1234567898765432);
+    // drive->getModel()->arcade(controller.getAnalog(ControllerAnalog::leftY),
+    //                           controller.getAnalog(ControllerAnalog::rightX));
+    // if (intakeIn.isPressed()) {
+    //   intake.moveVoltage(intakeVoltage);
+    // } else if (intakeOut.isPressed()) {
+    //   intake.moveVoltage(-intakeVoltage);
+    // } else {
+    //   intake.moveVoltage(0);
+    // }
 
-    if (flywheelSpin.changedToReleased()) {
-      flywheelOn = !flywheelOn;
-    }
-    flywheel.moveVoltage(flywheelOn ? 12000 : 0);
+    // if (flywheelSpin.changedToReleased()) {
+    //   flywheelOn = !flywheelOn;
+    // }
+    // flywheel.moveVoltage(flywheelOn ? 12000 : 0);
+    
+    // if(switchMode.isPressed()) {
+    //   arcadeDrive = !arcadeDrive;
+    // }
+    // if(arcadeDrive){
+    //   drive->getModel()->arcade(controller.getAnalog(ControllerAnalog::leftY),
+    //                           controller.getAnalog(ControllerAnalog::rightX));
+    // } else {
+    //   drive->getModel()->tank(controller.getAnalog(ControllerAnalog::leftY), controller.getAnalog(ControllerAnalog::rightY));
+    // }
+
 
     pros::delay(10);
   }
