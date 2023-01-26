@@ -18,8 +18,7 @@ void on_center_button() {
 }
 Controller controller;
 Motor intake(14);
-Motor flywheel(-15);
-pros::Motor p_flywheel(-15);
+pros::Motor flywheel(-15);
 IMU imu(17);
 
 ControllerButton intakeIn(ControllerDigital::R2);
@@ -57,9 +56,8 @@ std::shared_ptr<AsyncMotionProfileController> profileController =
 void initialize() {
   drive->getModel()->setBrakeMode(AbstractMotor::brakeMode::brake);
   intake.setBrakeMode(AbstractMotor::brakeMode::brake);
-  flywheel.setBrakeMode(AbstractMotor::brakeMode::coast);
+  flywheel.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
   intake.moveVelocity(600);
-  flywheel.moveVelocity(600);
 }
 
 /**
@@ -103,9 +101,9 @@ public:
         moveSlowState(false), robotControlsDaemon([=] {
           while (69) {
             if (flywheelState) {
-              flywheel.moveVoltage(12000);
+              flywheel.move_voltage(12000);
             } else {
-              flywheel.moveVoltage(0);
+              flywheel.move_voltage(0);
             }
             if (intakeState) {
               intake.moveVoltage(intakeVoltage);
@@ -172,9 +170,9 @@ void opcontrol() {
       flywheelOn = !flywheelOn;
     }
     if(flywheelOn){
-      flywheel.moveVoltage(12000);
+      flywheel.move_voltage(12000);
     } else{
-      flywheel.moveVoltage(0);
+      flywheel.move_voltage(0);
     }
     if (switchMode.isPressed()) {
       arcadeDrive = !arcadeDrive;
@@ -187,8 +185,7 @@ void opcontrol() {
                               controller.getAnalog(ControllerAnalog::rightY));
     }
     pros::screen::set_pen(COLOR_BLUE);
-    pros::screen::print(pros::E_TEXT_LARGE, 3, std::to_string(flywheel.getVoltage()).c_str());
-        pros::screen::print(pros::E_TEXT_LARGE, 6, "hi");
+    pros::screen::print(pros::E_TEXT_LARGE, 3, std::to_string(flywheel.get_voltage()).c_str());
 
     pros::delay(10);
   }
