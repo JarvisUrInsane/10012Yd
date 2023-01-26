@@ -1,4 +1,5 @@
 #include "main.h"
+#include <sstream>
 
 /**
  * A callback function for LLEMU's center button.
@@ -34,10 +35,10 @@ auto drive = ChassisControllerBuilder()
                  .withGains({0.0009, 0, 0.000001},  // Distance controller gains
                             {0.0005, 0.002, 0.0001} // Turn controller gains
                             )
-                //  .withSensors(12, 19, ADIEncoder{'A', 'B'})
-                //  .withOdometry({{2.75_in, 7_in}, quadEncoderTPR})
-                //  .buildOdometry();
-                .build();
+                 //  .withSensors(12, 19, ADIEncoder{'A', 'B'})
+                 //  .withOdometry({{2.75_in, 7_in}, quadEncoderTPR})
+                 //  .buildOdometry();
+                 .build();
 std::shared_ptr<AsyncMotionProfileController> profileController =
     AsyncMotionProfileControllerBuilder()
         .withLimits({
@@ -58,8 +59,7 @@ void initialize() {
   intake.setBrakeMode(AbstractMotor::brakeMode::brake);
   flywheel.setBrakeMode(AbstractMotor::brakeMode::coast);
   intake.moveVelocity(600);
-
-
+  flywheel.moveVelocity(600);
 }
 
 /**
@@ -95,11 +95,12 @@ const int intakeVoltage = 10000;
 struct RobotControls {
 private:
   pros::Task robotControlsDaemon;
+
 public:
   bool flywheelState, intakeState, indexerState, moveSlowState;
   RobotControls()
-      : flywheelState(false), intakeState(false), indexerState(false), moveSlowState(false),
-        robotControlsDaemon([=] {
+      : flywheelState(false), intakeState(false), indexerState(false),
+        moveSlowState(false), robotControlsDaemon([=] {
           while (69) {
             if (flywheelState) {
               flywheel.moveVoltage(12000);
@@ -108,15 +109,14 @@ public:
             }
             if (intakeState) {
               intake.moveVoltage(intakeVoltage);
-            } 
-            else if (indexerState) {
+            } else if (indexerState) {
               intake.moveVoltage(-intakeVoltage / 2);
             } else {
               intake.moveVoltage(0);
             }
-            if (moveSlowState){
+            if (moveSlowState) {
               drive->setMaxVelocity(150);
-            } else{
+            } else {
               drive->setMaxVelocity(600);
             }
             pros::delay(20);
@@ -158,33 +158,39 @@ void opcontrol() {
   bool flywheelOn = false;
   bool arcadeDrive = true;
   while (true) {
-    p_flywheel.move_voltage(1234567898765432);
-    // drive->getModel()->arcade(controller.getAnalog(ControllerAnalog::leftY),
-    //                           controller.getAnalog(ControllerAnalog::rightX));
-    // if (intakeIn.isPressed()) {
-    //   intake.moveVoltage(intakeVoltage);
-    // } else if (intakeOut.isPressed()) {
-    //   intake.moveVoltage(-intakeVoltage);
-    // } else {
-    //   intake.moveVoltage(0);
-    // }
+    drive->getModel()->arcade(controller.getAnalog(ControllerAnalog::leftY),
+                              controller.getAnalog(ControllerAnalog::rightX));
+    if (intakeIn.isPressed()) {
+      intake.moveVoltage(intakeVoltage);
+    } else if (intakeOut.isPressed()) {
+      intake.moveVoltage(-intakeVoltage);
+    } else {
+      intake.moveVoltage(0);
+    }
 
-    // if (flywheelSpin.changedToReleased()) {
-    //   flywheelOn = !flywheelOn;
-    // }
-    // flywheel.moveVoltage(flywheelOn ? 12000 : 0);
-    
-    // if(switchMode.isPressed()) {
-    //   arcadeDrive = !arcadeDrive;
-    // }
-    // if(arcadeDrive){
-    //   drive->getModel()->arcade(controller.getAnalog(ControllerAnalog::leftY),
-    //                           controller.getAnalog(ControllerAnalog::rightX));
-    // } else {
-    //   drive->getModel()->tank(controller.getAnalog(ControllerAnalog::leftY), controller.getAnalog(ControllerAnalog::rightY));
-    // }
-
+    if (flywheelSpin.changedToReleased()) {
+      flywheelOn = !flywheelOn;
+    }
+    if(flywheelOn){
+      flywheel.moveVoltage(12000);
+    } else{
+      flywheel.moveVoltage(0);
+    }
+    if (switchMode.isPressed()) {
+      arcadeDrive = !arcadeDrive;
+    }
+    if (arcadeDrive) {
+      drive->getModel()->arcade(controller.getAnalog(ControllerAnalog::leftY),
+                                controller.getAnalog(ControllerAnalog::rightX));
+    } else {
+      drive->getModel()->tank(controller.getAnalog(ControllerAnalog::leftY),
+                              controller.getAnalog(ControllerAnalog::rightY));
+    }
+    pros::screen::set_pen(COLOR_BLUE);
+    pros::screen::print(pros::E_TEXT_LARGE, 3, std::to_string(flywheel.getVoltage()).c_str());
+        pros::screen::print(pros::E_TEXT_LARGE, 6, "hi");
 
     pros::delay(10);
   }
+  
 }
